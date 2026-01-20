@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASSET MASTER - 完整進階版</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <style>
+        :root { 
+            --pure-black: #000000; --dark-gray: #0d1117; 
+            --border: #30363d; --accent-gold: #ffd700;
+            --inc-green: #00ff88; --exp-red: #ff4b4b;
+        }
+        html, body { height: 100%; margin: 0; background-color: var(--pure-black); color: #e0e6ed; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; }
+        .optimized-container { width: 85%; max-width: 1600px; margin: 0 auto; padding: 30px 0; flex: 1; display: flex; flex-direction: column; }
+        .nav-tabs { border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+        .nav-link { color: #8b949e; border: none !important; font-weight: 600; padding: 10px 30px; }
+        .nav-link.active { color: var(--accent-gold) !important; background: transparent !important; border-bottom: 3px solid var(--accent-gold) !important; }
+        .card { background-color: var(--dark-gray); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 20px; }
+        .stat-card { border-top: 3px solid var(--accent-gold); padding: 15px; }
+        input, select { background: #010409 !important; color: white !important; border: 1px solid var(--border) !important; }
+        .btn-gold { background-color: var(--accent-gold); color: black; font-weight: bold; border: none; padding: 10px; }
+        
+        .expense-item { 
+            background: #161b22; border-radius: 8px; padding: 12px 15px; margin-bottom: 8px; 
+            display: flex; flex-direction: column; border: 1px solid transparent; transition: 0.2s;
+        }
+        .expense-item:hover { border-color: #444; background: #1c2128; }
+        .item-main { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .item-memo { font-size: 0.75rem; color: #6e7681; margin-top: 4px; padding-left: 95px; }
+        .item-date { font-size: 0.8rem; color: #8b949e; min-width: 85px; font-family: monospace; }
+        
+        .quick-section-title { font-size: 0.75rem; color: #8b949e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .quick-btn { font-size: 0.8rem; border: 1px solid var(--border); color: #e0e6ed; padding: 5px 12px; transition: 0.2s; background: #21262d; border-radius: 6px; cursor: pointer; }
+        .quick-btn:hover { border-color: var(--accent-gold); background: #30363d; color: var(--accent-gold); }
+        .btn-inc { border-left: 4px solid var(--inc-green); }
+        .btn-exp { border-left: 4px solid var(--exp-red); }
+        .btn-add-custom { border: 1px dashed #555; color: #8b949e; background: transparent; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
+
+        #quickModal {
+            display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+            background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center;
+        }
+        /* 彈窗背景遮罩：確保全螢幕置中 */
+        .custom-modal {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 10000;
+        }
+        /* 彈窗主體：限制高度並允許內部捲動 */
+        .custom-modal-content {
+            width: 90%; max-width: 700px; max-height: 80vh;
+            background: #1c2128; border: 1px solid var(--border); border-radius: 12px;
+            display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        /* 表格捲動區 */
+        .custom-modal-body {
+            padding: 0; overflow-y: auto; flex: 1;
+        }
+        .custom-modal-body thead th {
+            position: sticky; top: 0; background-color: #2d333b; z-index: 2;
+        }
+        /* 修改後的最終版本 */
+        #main-chart, #life-chart {
+            width: 100% !important;
+            min-width: 100% !important; /* 保留這行，防止被 Plotly 縮小 */
+            min-height: 580px;
+            flex-grow: 1;               /* 確保在 flex 下自動撐開 */
+            display: block !important;
+        }
+    </style>
+
+    <script>
+        /* global firebase */
+        /* global db */
+        /* global auth */
+        // 你的 Firebase 配置
+        const firebaseConfig = {
+            apiKey: "AIzaSyB1md9gANnlldBzpi7GtoHfBuyciWEpJZY",
+            authDomain: "jayfms-b8bde.firebaseapp.com",
+            projectId: "jayfms-b8bde",
+            storageBucket: "jayfms-b8bde.firebasestorage.app",
+            messagingSenderId: "898098748288",
+            appId: "1:898098748288:web:d36aaf53c2ad5694f67f65"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // 全域變數初始化
+        let tradeData = [];
+        let lifeData = [];
+        let customBtns = { inc: ['薪資', '投資收入'], exp: ['房貸', '飲食', '交通', '車貸', '保險'] };
+        let currentUser = null;
+
+        // 監聽登入狀態
+        auth.onAuthStateChanged(user => {
+            const statusText = document.getElementById('user-status');
+            const loginForm = document.getElementById('login-form');
+            const logoutBtn = document.getElementById('logout-btn');
+
+            if (user) {
+                currentUser = user;
+                statusText.innerHTML = `👤 已連線: <span style="color:var(--accent-gold)">${user.email}</span>`;
+                loginForm.style.display = 'none';
+                logoutBtn.style.display = 'block';
+                loadDataFromCloud(user.uid);
+            } else {
+                currentUser = null;
+                statusText.innerHTML = "❌ 尚未登入";
+                loginForm.style.display = 'flex';
+                logoutBtn.style.display = 'none';
+            }
+        });
+
+        // 雲端功能函數
+        async function handleSignUp() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            try { await auth.createUserWithEmailAndPassword(email, pass); alert("註冊成功！"); } 
+            catch(e) { alert("錯誤: " + e.message); }
+        }
+        async function handleLogin() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            try { await auth.signInWithEmailAndPassword(email, pass); } 
+            catch(e) { alert("登入失敗: " + e.message); }
+        }
+        function handleLogout() { auth.signOut(); }
+
+        // 核心同步邏輯
+        async function saveDataToCloud() {
+            if (!currentUser) return;
+            await db.collection("users").doc(currentUser.uid).set({
+                tradeData, lifeData, customBtns, lastUpdate: new Date()
+            });
+            console.log("☁️ 雲端備份成功");
+        }
+
+        async function loadDataFromCloud(uid) {
+            const doc = await db.collection("users").doc(uid).get();
+            if (doc.exists) {
+                const data = doc.data();
+                tradeData = data.tradeData || [];
+                lifeData = data.lifeData || [];
+                customBtns = data.customBtns || customBtns;
+                
+                // 修改這裡：確保原本的函數存在才執行，避免報錯
+                if (typeof renderAllButtons === "function") renderAllButtons();
+                if (typeof updateAll === "function") updateAll(); 
+            } else {
+                // 修改這裡：如果還沒寫初始化函數，先跳過
+                if (typeof resetInitialAsset === "function") resetInitialAsset();
+            }
+        }
+    </script>
+</head>
+<body>
+
+<div class="optimized-container">
+    <div class="optimized-container">
+    <div class="card p-3 mb-4 d-flex flex-row justify-content-between align-items-center" style="border-left: 5px solid var(--accent-gold); background: #161b22;">
+        <div id="user-status" style="font-size: 0.9rem; color: #8b949e;">⏳ 正在連線...</div>
+        <div id="login-form" style="display: none;">
+            <input type="email" id="auth-email" placeholder="信箱" class="form-control form-control-sm d-inline-block w-auto me-1" style="background:#000; color:#fff; border:1px solid #30363d;">
+            <input type="password" id="auth-pass" placeholder="密碼" class="form-control form-control-sm d-inline-block w-auto me-1" style="background:#000; color:#fff; border:1px solid #30363d;">
+            <button onclick="handleLogin()" class="btn btn-warning btn-sm fw-bold" style="background:#ffd700; color:#000;">登入</button>
+            <button onclick="handleSignUp()" class="btn btn-outline-light btn-sm ms-1">註冊</button>
+        </div>
+        <button id="logout-btn" onclick="handleLogout()" class="btn btn-outline-danger btn-sm" style="display: none;">登出</button>
+    </div>
+
+    <header class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h2 style="color: var(--accent-gold); margin: 0; letter-spacing: 1px;">ASSET MASTER</h2>
+            <div class="small text-muted">全方位交易績效與配置規劃系統</div>
+        </div>
+        <div class="text-end">
+            <button class="btn btn-outline-warning btn-sm me-2" onclick="resetButtons()">重置按鈕配置</button>
+            <button class="btn btn-outline-danger btn-sm me-2" onclick="clearData()">清除數據</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="exportJSON()">備份數據</button>
+        </div>
+    </header>
+
+    <ul class="nav nav-tabs" id="myTab">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#trade-content">📈 選擇權績效</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#life-content">🏠 生活收支管理</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#plan-content">⚖️ 綜合規劃總覽</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="trade-content">
+            <div class="row g-4">
+                <div class="col-lg-3">
+                    <div class="card p-4">
+                        <h6 class="text-center mb-4 text-info">數據登錄</h6>
+                        <div class="mb-2">
+                            <label class="small text-muted mb-1">日期周期</label>
+                            <input type="text" id="tradeWeek" class="form-control" placeholder="01W1">
+                        </div>
+                        <div class="mb-2">
+                            <label class="small text-muted mb-1">平倉損益</label>
+                            <input type="number" id="tradeGross" class="form-control" placeholder="0" oninput="calculateAutoNet()">
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="small text-muted mb-1">手續費</label>
+                                <input type="number" id="tradeFee" class="form-control" placeholder="0" oninput="calculateAutoNet()">
+                            </div>
+                            <div class="col-6">
+                                <label class="small text-muted mb-1">稅金</label>
+                                <input type="number" id="tradeTax" class="form-control" placeholder="0" oninput="calculateAutoNet()">
+                            </div>
+                        </div>
+                        <div class="mb-4 p-2 rounded" style="background: rgba(255,255,255,0.05); border: 1px dashed #444;">
+                            <label class="small text-muted mb-1 d-block">自動計算淨損益：</label>
+                            <div id="autoNetDisplay" class="h5 m-0" style="color: var(--accent-gold)">$0</div>
+                        </div>
+                        <button class="btn btn-gold w-100 mb-4" onclick="addTrade()">儲存數據</button>
+                        <div class="p-3 border border-secondary rounded" style="background: rgba(0,210,255,0.05);">
+                            <div class="small text-muted">50% 預留保證金建議：</div>
+                            <div id="adviceFund" class="fw-bold text-info fs-5">$0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-9">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-muted m-0">績效概覽</h6>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="toggleDetail" onchange="toggleDetailStats()">
+                                <label class="form-check-label small text-muted" for="toggleDetail">顯示成本明細</label>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-2">
+                            <div class="col-4">
+                                <div class="card stat-card">
+                                    <div>帳戶總資產</div>
+                                    <div class="h4 mt-1" id="dispTotal" style="color: var(--accent-gold)">0</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="card stat-card">
+                                    <div>累計淨損益</div>
+                                    <div class="h4 mt-1" id="dispNet">0</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="card stat-card">
+                                    <div>當前報酬率</div>
+                                    <div class="h4 mt-1" id="dispROI">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3" id="detailStats" style="display: none;">
+                            <div class="col-4">
+                                <div class="card stat-card" style="border-top-color: #58a6ff;">
+                                    <div class="small text-muted">累計平倉損益</div>
+                                    <div class="h5 mt-1" id="dispGross" style="color: #e0e6ed">0</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="card stat-card" style="border-top-color: #ff7b72;">
+                                    <div class="small text-muted">累計手續費</div>
+                                    <div class="h5 mt-1" id="dispTotalFee" style="color: #ff7b72">0</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="card stat-card" style="border-top-color: #ff7b72;">
+                                    <div class="small text-muted">累計稅金</div>
+                                    <div class="h5 mt-1" id="dispTotalTax" style="color: #ff7b72">0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card p-0">
+                        <div class="d-flex justify-content-between align-items-center p-3 border-bottom border-secondary">
+                            <h6 class="m-0 text-muted">績效趨勢圖</h6>
+                            <div class="d-flex align-items-center">
+                                <label class="small text-muted me-2">月份篩選:</label>
+                                <select id="monthFilter" class="form-select form-select-sm bg-dark text-white border-secondary" style="width: 125px;" onchange="updateTradeUI()">
+                                    <option value="all">全部週資料</option>
+                                    <option value="01">01 月</option><option value="02">02 月</option><option value="03">03 月</option>
+                                    <option value="04">04 月</option><option value="05">05 月</option><option value="06">06 月</option>
+                                    <option value="07">07 月</option><option value="08">08 月</option><option value="09">09 月</option>
+                                    <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="main-chart" style="height: 600px;"></div>
+                        <div class="mt-3 text-end">
+                            <button class="btn btn-outline-info btn-sm" onclick="showHistoryModal()">
+                                🛠️ 管理歷史數據 / 編輯資料
+                            </button>
+                        </div>
+
+                        <div id="historyModal" class="custom-modal" style="display:none;">
+                            <div class="custom-modal-content">
+                                <div class="p-3 border-bottom border-secondary d-flex justify-content-between align-items-center">
+                                    <h6 class="m-0 text-info">歷史數據管理</h6>
+                                    <button type="button" class="btn-close btn-close-white" onclick="closeHistoryModal()"></button>
+                                </div>
+                                
+                                <div class="custom-modal-body">
+                                    <table class="table table-dark table-hover mb-0" style="font-size: 0.9rem;">
+                                        <thead>
+                                            <tr>
+                                                <th class="ps-3">週期</th>
+                                                <th>平倉</th>
+                                                <th>費用</th>
+                                                <th>稅金</th>
+                                                <th class="text-center">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="historyTableBody">
+                                            </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="p-2 border-top border-secondary text-end">
+                                    <button class="btn btn-sm btn-secondary" onclick="closeHistoryModal()">關閉</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="life-content">
+            <div class="row g-4">
+                <div class="col-lg-5">
+                    <div class="card p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="text-info m-0">收支管理 <small style="font-size: 0.6rem; color: #666;">(按鈕右鍵刪除)</small></h5>
+                            <select id="currentMonth" class="form-select form-select-sm w-auto" onchange="updateAll()">
+                                <script>
+                                    for(let i=1; i<=12; i++) document.write(`<option value="${i}">${i}月</option>`);
+                                </script>
+                                <option value="ALL" style="color: var(--accent-gold);">📊 年度總計</option>
+                            </select>
+                        </div>
+
+                        <div id="quick-input-group">
+                            <div class="quick-section-title">收入項目</div>
+                            <div id="inc-btns" class="d-flex flex-wrap gap-2 mb-3">
+                                <button class="btn btn-sm quick-btn btn-add-custom" onclick="openBtnModal('inc')">+ 新增收入鈕</button>
+                            </div>
+
+                            <div class="quick-section-title">支出項目 (自動轉負)</div>
+                            <div id="exp-btns" class="d-flex flex-wrap gap-2 mb-4">
+                                <button class="btn btn-sm quick-btn btn-add-custom" onclick="openBtnModal('exp')">+ 新增支出鈕</button>
+                            </div>
+
+                            <div class="input-group mb-2">
+                                <input type="date" id="lifeDate" class="form-control" style="flex: 0.7;">
+                                <input type="text" id="lifeItem" class="form-control" placeholder="項目內容">
+                                <input type="number" id="lifeAmount" class="form-control" placeholder="金額">
+                            </div>
+                            <div class="input-group mb-4">
+                                <input type="text" id="lifeMemo" class="form-control" placeholder="備註 (選填)">
+                                <button class="btn btn-primary" onclick="addLifeItem()">新增記錄</button>
+                            </div>
+                        </div>
+                        
+                        <div id="expenseList" style="height: 320px; overflow-y: auto; padding-right: 5px;"></div>
+                    </div>
+                </div>
+                <div class="col-lg-7"><div class="card p-4"><div id="life-chart" style="height: 580px;"></div></div></div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="plan-content">
+            <div class="row g-4 text-center">
+                <div class="col-md-4"><div class="card stat-card" style="padding:30px"><div>帳戶資產</div><h2 id="plan-trade" class="mt-2" style="color: var(--accent-gold)">$0</h2></div></div>
+                <div class="col-md-4"><div class="card stat-card" style="padding:30px; border-top-color: var(--exp-red)"><div>選定支出</div><h2 id="plan-expense" class="mt-2" style="color: var(--exp-red)">$0</h2></div></div>
+                <div class="col-md-4"><div class="card stat-card" style="padding:30px; border-top-color: var(--inc-green)"><div>預估餘額</div><h2 id="plan-net" class="mt-2" style="color: var(--inc-green)">$0</h2></div></div>
+                <div class="col-12"><div class="card p-5 mt-2"><h3>財務生存力</h3><div id="plan-advice" class="display-4 fw-bold text-info">-- 個月</div></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="quickModal">
+    <div class="card" style="width:90%; max-width:400px; border:1px solid var(--accent-gold); padding:25px; background: var(--dark-gray);">
+        <h5 id="modalTitle" class="text-warning mb-4">快速記錄</h5>
+        <input type="hidden" id="modalType">
+        <input type="hidden" id="modalMode"> <div id="recordFields">
+            <div class="mb-3">
+                <label class="small text-muted mb-1">日期</label>
+                <input type="date" id="modalDate" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label class="small text-muted mb-1">金額</label>
+                <input type="number" id="modalAmount" class="form-control" placeholder="請輸入金額">
+            </div>
+            <div class="mb-4">
+                <label class="small text-muted mb-1">備註</label>
+                <input type="text" id="modalMemo" class="form-control" placeholder="備註內容 (選填)">
+            </div>
+        </div>
+
+        <div id="buttonFields" style="display:none;">
+            <div class="mb-4">
+                <label class="small text-muted mb-1">按鈕名稱</label>
+                <input type="text" id="modalBtnName" class="form-control" placeholder="例如：加油、獎金">
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary flex-grow-1" onclick="closeModal()">取消</button>
+            <button class="btn btn-gold flex-grow-1" onclick="handleModalSave()">儲存</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const defaultBtns = { 
+        inc: ['薪資', '投資收入'], 
+        exp: ['房貸', '飲食', '交通', '車貸', '保險'] 
+    };
+
+    tradeData = [];
+    lifeData = [];
+    customBtns = JSON.parse(JSON.stringify(defaultBtns));
+    isUpdating = false;
+
+    window.onload = function() {
+        if (tradeData.length === 0) resetInitialAsset();
+        
+        // 【新增這行】確保舊資料一讀取進來就自動按週次排序
+        recalculateTotals(); 
+        
+        document.getElementById('currentMonth').value = new Date().getMonth() + 1;
+        document.getElementById('lifeDate').valueAsDate = new Date();
+        renderAllButtons();
+        updateAll();
+    };
+
+    function resetInitialAsset() {
+        let start = prompt("請設定初始資產:", "100000");
+        tradeData = [{ week: '初始', net: 0, total: parseFloat(start || 100000) }];
+    }
+
+    function updateAll() {
+        localStorage.setItem('trades_vFinal', JSON.stringify(tradeData));
+        localStorage.setItem('life_vFinal', JSON.stringify(lifeData));
+        localStorage.setItem('custom_btns_vFinal', JSON.stringify(customBtns));
+
+        if (typeof saveDataToCloud === "function" && currentUser) {
+            console.log("正在嘗試推送到雲端..."); // 如果這行沒出現，代表沒執行到這裡
+            saveDataToCloud();
+        } else {
+            console.log("未存雲端：可能未登入或函數未定義", {currentUser, saveDataToCloud});
+        }
+        updateTradeUI(); updateLifeUI(); updatePlanUI();
+    }
+
+    function renderAllButtons() {
+        const incContainer = document.getElementById('inc-btns');
+        const expContainer = document.getElementById('exp-btns');
+        incContainer.querySelectorAll('.quick-btn:not(.btn-add-custom)').forEach(b => b.remove());
+        expContainer.querySelectorAll('.quick-btn:not(.btn-add-custom)').forEach(b => b.remove());
+        customBtns.inc.forEach(name => incContainer.insertBefore(createBtnElement(name, 'inc'), incContainer.lastElementChild));
+        customBtns.exp.forEach(name => expContainer.insertBefore(createBtnElement(name, 'exp'), expContainer.lastElementChild));
+    }
+
+    function createBtnElement(name, type) {
+        const btn = document.createElement('button');
+        btn.className = `btn btn-sm quick-btn ${type === 'inc' ? 'btn-inc' : 'btn-exp'}`;
+        btn.innerText = name;
+        btn.onclick = () => addQuickLife(name, type);
+        btn.oncontextmenu = (e) => {
+            e.preventDefault();
+            if(confirm(`確定刪除「${name}」按鈕？`)) {
+                customBtns[type] = customBtns[type].filter(b => b !== name);
+                renderAllButtons(); updateAll();
+            }
+        };
+        return btn;
+    }
+
+    function resetButtons() {
+        if(confirm("確定要將所有按鈕恢復成預設配置嗎？")) {
+            customBtns = JSON.parse(JSON.stringify(defaultBtns));
+            renderAllButtons(); updateAll();
+        }
+    }
+
+    // --- Modal 切換與邏輯 ---
+    function closeModal() { document.getElementById('quickModal').style.display = 'none'; }
+
+    // 模式 1: 記錄收支
+    function addQuickLife(name, type) {
+        const m = document.getElementById('currentMonth').value;
+        if (m === 'ALL') return alert('請先選取特定月份');
+        
+        document.getElementById('modalMode').value = 'record';
+        document.getElementById('recordFields').style.display = 'block';
+        document.getElementById('buttonFields').style.display = 'none';
+        
+        document.getElementById('modalTitle').innerText = (type === 'inc' ? '收入：' : '支出：') + name;
+        document.getElementById('modalType').value = type;
+        document.getElementById('modalDate').valueAsDate = new Date();
+        document.getElementById('modalAmount').value = '';
+        document.getElementById('modalMemo').value = '';
+        document.getElementById('quickModal').dataset.itemName = name;
+        
+        document.getElementById('quickModal').style.display = 'flex';
+        document.getElementById('modalAmount').focus();
+    }
+
+    // 模式 2: 新增按鈕
+    function openBtnModal(type) {
+        document.getElementById('modalMode').value = 'button';
+        document.getElementById('recordFields').style.display = 'none';
+        document.getElementById('buttonFields').style.display = 'block';
+        
+        document.getElementById('modalTitle').innerText = (type === 'inc' ? '新增收入按鈕' : '新增支出按鈕');
+        document.getElementById('modalType').value = type;
+        document.getElementById('modalBtnName').value = '';
+        
+        document.getElementById('quickModal').style.display = 'flex';
+        document.getElementById('modalBtnName').focus();
+    }
+
+    // 統一儲存入口
+    function handleModalSave() {
+        const mode = document.getElementById('modalMode').value;
+        const type = document.getElementById('modalType').value;
+
+        if (mode === 'record') {
+            const name = document.getElementById('quickModal').dataset.itemName;
+            const date = document.getElementById('modalDate').value;
+            const memo = document.getElementById('modalMemo').value;
+            let amt = parseFloat(document.getElementById('modalAmount').value);
+            const m = document.getElementById('currentMonth').value;
+            if (isNaN(amt)) return alert('請輸入金額');
+            if (type === 'exp') amt = -Math.abs(amt);
+            lifeData.push({ id: Date.now(), date: date || new Date().toISOString().split('T')[0], name, amt, month: m, memo });
+        } else {
+            const btnName = document.getElementById('modalBtnName').value;
+            if (!btnName || customBtns[type].includes(btnName)) return alert('名稱無效或已存在');
+            customBtns[type].push(btnName);
+            renderAllButtons();
+        }
+        updateAll();
+        closeModal();
+    }
+    // A. 顯示/隱藏明細切換
+    function toggleDetailStats() {
+        const detailRow = document.getElementById('detailStats');
+        detailRow.style.display = document.getElementById('toggleDetail').checked ? 'flex' : 'none';
+    }
+
+    // B. 即時計算淨損益預覽
+    function calculateAutoNet() {
+        const gross = parseFloat(document.getElementById('tradeGross').value) || 0;
+        const fee = parseFloat(document.getElementById('tradeFee').value) || 0;
+        const tax = parseFloat(document.getElementById('tradeTax').value) || 0;
+        const net = gross - fee - tax;
+        const display = document.getElementById('autoNetDisplay');
+        display.innerText = "$" + net.toLocaleString();
+        display.style.color = net >= 0 ? '#00ff88' : '#ff4b4b';
+        return net;
+    }
+
+    // C. 更新 UI 統計數據 (修改後包含 3+3 統計)
+    function updateTradeUI() {
+        if (!tradeData.length) return;
+
+        const selectedMonth = document.getElementById('monthFilter').value;
+        let weeks = [];
+        let nets = [];
+        let totals = [];
+        const startTotal = tradeData[0].total;
+
+        // --- A. 數據處理邏輯 (確保包含初始點，防止黃線懸空) ---
+        if (selectedMonth === 'yearly_monthly') {
+            const monthlyMap = {};
+            tradeData.slice(1).forEach(d => {
+                const monthStr = d.week.substring(0, 2); 
+                if (!monthlyMap[monthStr]) monthlyMap[monthStr] = 0;
+                monthlyMap[monthStr] += d.net;
+            });
+
+            const sortedMonths = Object.keys(monthlyMap).sort();
+            // 補上「初始」點，讓年度報表黃線也從最左下角開始
+            weeks = ['初始', ...sortedMonths.map(m => m + "月")];
+            nets = [0, ...sortedMonths.map(m => monthlyMap[m])];
+            
+            let runningTotal = startTotal;
+            totals = [startTotal];
+            sortedMonths.forEach(m => {
+                runningTotal += monthlyMap[m];
+                totals.push(runningTotal);
+            });
+        } else {
+            // 特定月份篩選：強制包含「初始」點，解決 02, 03 月懸空問題
+            let filteredData = tradeData;
+            if (selectedMonth !== 'all') {
+                filteredData = tradeData.filter(d => 
+                    d.week === '初始' || d.week.startsWith(selectedMonth)
+                );
+            }
+            weeks = filteredData.map(d => d.week);
+            nets = filteredData.map(d => d.net);
+            totals = filteredData.map(d => d.total);
+        }
+
+        // --- B. 原本的看板統計功能 (嚴格保留，不作更動) ---
+        const currentTotal = tradeData[tradeData.length - 1].total;
+        const netSum = currentTotal - startTotal;
+        const roi = ((netSum / startTotal) * 100).toFixed(2);
+        const totalGross = tradeData.reduce((sum, item) => sum + ((item.net + (item.fee || 0) + (item.tax || 0)) || 0), 0);
+        const totalFee = tradeData.reduce((sum, item) => sum + (item.fee || 0), 0);
+        const totalTax = tradeData.reduce((sum, item) => sum + (item.tax || 0), 0);
+
+        document.getElementById('dispTotal').innerText = currentTotal.toLocaleString();
+        document.getElementById('dispNet').innerText = netSum.toLocaleString();
+        document.getElementById('dispROI').innerText = (roi > 0 ? "+" : "") + roi + "%";
+        document.getElementById('dispROI').style.color = roi >= 0 ? '#00ff88' : '#ff4b4b';
+        document.getElementById('dispGross').innerText = totalGross.toLocaleString();
+        document.getElementById('dispTotalFee').innerText = totalFee.toLocaleString();
+        document.getElementById('dispTotalTax').innerText = totalTax.toLocaleString();
+        document.getElementById('adviceFund').innerText = "$" + (currentTotal * 0.5).toLocaleString();
+
+        // --- C. 繪製圖表 (強制 X 軸為 category 模式) ---
+        const maxNetAbs = Math.max(...nets.map(Math.abs), 50000); 
+        const y1Range = [-maxNetAbs * 1.2, maxNetAbs * 5]; 
+        const y2Range = [startTotal + y1Range[0], startTotal + y1Range[1]];
+        const gd = document.getElementById('main-chart');
+        
+        Plotly.newPlot(gd, [
+            { x: weeks, y: nets, type: 'bar', name: '損益', marker: {color: nets.map(n => n >= 0 ? '#00ff88' : '#ff4b4b')} },
+            { x: weeks, y: totals, type: 'scatter', mode: 'lines+markers', name: '帳戶', yaxis: 'y2', line: {color: '#ffd700', width: 3} }
+        ], {
+            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', font: { color: '#ffffff' },
+            dragmode: 'pan',
+            xaxis: { 
+                type: 'category', // 【解決關鍵】防止刻度變成 0, 1, 2
+                gridcolor: '#1f2937', 
+                range: [-0.5, Math.max(weeks.length - 0.5, 5)], // 鎖定最左邊
+                constrain: 'domain' 
+            },
+            yaxis: { tickformat: ',d', gridcolor: '#1f2937', zerolinecolor: '#ffffff', range: y1Range },
+            yaxis2: { overlaying: 'y', side: 'right', tickformat: ',d', gridcolor: 'transparent', range: y2Range },
+            margin: { t: 40, b: 40, l: 80, r: 80 }, showlegend: false
+        }, { responsive: true, displayModeBar: false, scrollZoom: true });
+
+        // --- D. 保留原本的縮放同步與邊界鎖定 ---
+        gd.removeAllListeners('plotly_relayout');
+        gd.on('plotly_relayout', (edata) => {
+            if (isUpdating) return;
+            let update = {};
+            if (edata['xaxis.range[0]'] !== undefined && edata['xaxis.range[0]'] < -0.5) update['xaxis.range[0]'] = -0.5;
+            if (edata['yaxis.range[0]'] !== undefined) {
+                const l = edata['yaxis.range[0]'], h = edata['yaxis.range[1]'];
+                update['yaxis2.range'] = [startTotal + l, startTotal + h];
+            } else if (edata['yaxis2.range[0]'] !== undefined) {
+                const l = edata['yaxis2.range[0]'], h = edata['yaxis2.range[1]'];
+                update['yaxis.range'] = [l - startTotal, h - startTotal];
+            }
+            if (Object.keys(update).length > 0) { 
+                isUpdating = true; 
+                Plotly.relayout(gd, update).then(() => isUpdating = false); 
+            }
+        });
+
+        if (document.getElementById('historyModal').style.display === 'flex') renderHistoryTable();
+    }
+
+    // 新增的即時計算邏輯
+    function calculateAutoNet() {
+        const gross = parseFloat(document.getElementById('tradeGross').value) || 0;
+        const fee = parseFloat(document.getElementById('tradeFee').value) || 0;
+        const tax = parseFloat(document.getElementById('tradeTax').value) || 0;
+        const net = gross - fee - tax;
+        
+        const display = document.getElementById('autoNetDisplay');
+        display.innerText = "$" + net.toLocaleString();
+        display.style.color = net >= 0 ? '#00ff88' : '#ff4b4b';
+        return net;
+    }
+
+    // 修改過的 addTrade 函數
+    function addTrade() {
+        const week = document.getElementById('tradeWeek').value;
+        const gross = parseFloat(document.getElementById('tradeGross').value) || 0;
+        const fee = parseFloat(document.getElementById('tradeFee').value) || 0;
+        const tax = parseFloat(document.getElementById('tradeTax').value) || 0;
+        const net = gross - fee - tax;
+        
+        if (!week || document.getElementById('tradeGross').value === "") return;
+
+        
+        // 這裡新增 fee 和 tax 的紀錄
+        tradeData.push({ 
+            week, 
+            net, 
+            total: 0,
+            fee: fee, // 紀錄累計用
+            tax: tax  // 紀錄累計用
+        });
+        
+        recalculateTotals();
+
+        updateAll();
+
+        if (typeof renderHistoryTable === "function") {
+            renderHistoryTable();
+        }
+        
+        ['tradeWeek', 'tradeGross', 'tradeFee', 'tradeTax'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('autoNetDisplay').innerText = '$0';
+    }
+
+    function addLifeItem() {
+        const date = document.getElementById('lifeDate').value;
+        const name = document.getElementById('lifeItem').value;
+        const memo = document.getElementById('lifeMemo').value;
+        let amt = parseFloat(document.getElementById('lifeAmount').value);
+        const month = document.getElementById('currentMonth').value;
+        if (!name || isNaN(amt) || month === 'ALL') return;
+        amt = -Math.abs(amt); 
+        lifeData.push({ id: Date.now(), date: date || new Date().toISOString().split('T')[0], name, amt, month, memo }); 
+        updateAll();
+        document.getElementById('lifeItem').value = ''; document.getElementById('lifeAmount').value = ''; document.getElementById('lifeMemo').value = '';
+    }
+
+    function deleteLifeItem(id) { lifeData = lifeData.filter(i => i.id !== id); updateAll(); }
+
+    function updateLifeUI() {
+        const el = document.getElementById('expenseList');
+        const currentM = document.getElementById('currentMonth').value;
+        const quickInput = document.getElementById('quick-input-group');
+        const gd = document.getElementById('life-chart');
+        
+        const baseLayout = {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#8b949e' },
+            xaxis: { 
+                gridcolor: '#1f2937', 
+                zeroline: false,
+                fixedrange: true // 鎖定 X 軸，滾輪縮放只會影響 Y 軸
+            },
+            yaxis: { 
+                gridcolor: '#1f2937', 
+                zeroline: false,
+                tickformat: ',d' 
+            },
+            margin: { t: 60, b: 60, l: 60, r: 60 },
+            dragmode: 'pan' // 預設為抓取模式
+        };
+
+        if (currentM === 'ALL') {
+            quickInput.style.display = 'none';
+            
+            // 側邊清單邏輯
+            const summary = {};
+            lifeData.forEach(i => { summary[i.name] = (summary[i.name] || 0) + i.amt; });
+            const displayData = Object.keys(summary).map(key => ({ name: key, amt: summary[key] }));
+            el.innerHTML = displayData.sort((a,b) => a.amt-b.amt).map(i => `
+                <div class="expense-item">
+                    <div class="item-main">
+                        <span>${i.name}</span>
+                        <span style="color:${i.amt>=0?'#00ff88':'#ff4b4b'}">${i.amt.toLocaleString()}</span>
+                    </div>
+                </div>`).join('');            
+
+            // 年度長條圖邏輯
+            const monthlyExp = Array(12).fill(0);
+            lifeData.filter(i => i.amt < 0).forEach(i => {
+                const mIdx = parseInt(i.month) - 1;
+                if(mIdx >= 0 && mIdx < 12) monthlyExp[mIdx] += Math.abs(i.amt);
+            });
+
+            const data = [{
+                x: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+                y: monthlyExp,
+                type: 'bar',
+                marker: { color: '#ffd700' },
+                hovertemplate: '%{x}<br>支出: %{y:,.0f}<extra></extra>'
+            }];
+
+            Plotly.newPlot(gd, data, { 
+                ...baseLayout, 
+                title: { text: '年度支出趨勢', font: {color: '#fff'} } 
+            }, { 
+                responsive: true, 
+                displayModeBar: false, 
+                scrollZoom: true // 開啟滾輪縮放
+            });
+
+        } else {
+            // --- 特定月份：專業漸層雙環圖 ---
+            quickInput.style.display = 'block';
+            const filtered = lifeData.filter(i => i.month === currentM).sort((a,b) => new Date(a.date) - new Date(b.date));
+            
+            // 1. 列表更新 (左下角部分：保留原本收入綠 #00ff88 / 支出紅 #ff4b4b)
+            el.innerHTML = filtered.map(i => `
+                <div class="expense-item">
+                    <div class="item-main">
+                        <span class="item-date">${i.date ? i.date.substring(5) : ''}</span>
+                        <strong style="flex:1; margin-left:10px;">${i.name}</strong>
+                        <span style="color:${i.amt>=0?'#00ff88':'#ff4b4b'}">${i.amt.toLocaleString()}</span>
+                        <button class="btn btn-sm btn-outline-secondary ms-2" onclick="deleteLifeItem(${i.id})" style="padding:0 5px;">×</button>
+                    </div>
+                    ${i.memo ? `<div class="item-memo">📝 ${i.memo}</div>` : ''}
+                </div>`).join('');                
+
+            let incSum = 0, expSum = 0;
+            const incItems = {}, expItems = {};
+            filtered.forEach(item => {
+                const val = Math.abs(item.amt);
+                if (item.amt >= 0) { incSum += val; incItems[item.name] = (incItems[item.name] || 0) + val; }
+                else { expSum += val; expItems[item.name] = (expItems[item.name] || 0) + val; }
+            });
+
+            const labels = ['收入總計', '支出總計'];
+            const parents = ['', ''];
+            const values = [incSum, expSum];
+            const ids = ['INC_ROOT', 'EXP_ROOT'];
+            
+            // 2. 雙環圖顏色設定：內圈深藍與深橘
+            const colors = ['#0056b3', '#d9480f']; 
+
+            // 收入子項：藍色系漸層 (HSL 210)
+            const incNames = Object.keys(incItems);
+            incNames.forEach((name, i) => {
+                ids.push('INC_' + name);
+                labels.push(name);
+                parents.push('INC_ROOT');
+                values.push(incItems[name]);
+                const lightness = 35 + (i * (40 / Math.max(incNames.length, 1)));
+                colors.push(`hsl(210, 85%, ${lightness}%)`); 
+            });
+
+            // 支出子項：橘色系漸層 (HSL 25)
+            const expNames = Object.keys(expItems);
+            expNames.forEach((name, i) => {
+                ids.push('EXP_' + name);
+                labels.push(name);
+                parents.push('EXP_ROOT');
+                values.push(expItems[name]);
+                const lightness = 45 + (i * (35 / Math.max(expNames.length, 1)));
+                colors.push(`hsl(25, 95%, ${lightness}%)`);
+            });
+
+            // 3. 繪製圖表
+            Plotly.newPlot(gd, [{
+                type: "sunburst",
+                ids: ids,
+                labels: labels,
+                parents: parents,
+                values: values,
+                branchvalues: "total",
+                insidetextorientation: 'horizontal',
+                // --- 文字樣式設定 ---
+                insidetextfont: {
+                    color: "#ffffff", // 圖內文字全白
+                    size: 18       // 字體大小設定處
+                },
+                marker: {
+                    colors: colors,
+                    line: { width: 1.5, color: '#0d1117' }
+                },
+                leaf: { opacity: 0.85 },
+                hovertemplate: '<b>%{label}</b><br>金額: $%{value:,.0f}<br>佔比: %{percentParent:.1%}<extra></extra>'
+            }], {
+                ...baseLayout,
+                title: { 
+                    text: `<b>${currentM}月 財務權重分佈</b>`, 
+                    font: { color: '#e0e6ed', size: 16 } 
+                },
+                margin: { t: 40, l: 0, r: 0, b: 0 },
+                sunburstcolorway: ["#1f77b4", "#ff7f0e"] 
+            }, { 
+                responsive: true, 
+                displayModeBar: false 
+            });
+        }
+    }
+
+    function updatePlanUI() {
+        const tradeTotal = tradeData[tradeData.length - 1]?.total || 0;
+        const currentM = document.getElementById('currentMonth').value;
+        const filtered = currentM === 'ALL' ? lifeData : lifeData.filter(i => i.month === currentM);
+        const expenseSum = filtered.filter(i => i.amt < 0).reduce((a, b) => a + Math.abs(b.amt), 0);
+        document.getElementById('plan-trade').innerText = "$" + tradeTotal.toLocaleString();
+        document.getElementById('plan-expense').innerText = "$" + expenseSum.toLocaleString();
+        const divisor = currentM === 'ALL' ? (expenseSum / 12 || 1) : (expenseSum || 1);
+        document.getElementById('plan-net').innerText = "$" + (tradeTotal - expenseSum).toLocaleString();
+        document.getElementById('plan-advice').innerText = (tradeTotal / divisor).toFixed(1) + " 個月";
+    }
+
+    function clearData() { if (confirm("確定清除數據？")) { localStorage.clear(); location.reload(); } }
+    function exportJSON() {
+        const blob = new Blob([JSON.stringify({ trades: tradeData, life: lifeData, custom: customBtns })], {type: "application/json"});
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "AssetBackup.json"; a.click();
+    }
+    // A. 顯示與關閉彈窗
+    function showHistoryModal() {
+        renderHistoryTable(); // 打開時先畫表格
+        document.getElementById('historyModal').style.display = 'flex';
+    }
+
+    function closeHistoryModal() {
+        document.getElementById('historyModal').style.display = 'none';
+    }
+
+    // B. 生成表格內容 (倒序顯示最新的在上面)
+    function renderHistoryTable() {
+        const tbody = document.getElementById('historyTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        
+        // 跳過 index 0 (初始設定)，其餘倒序排列
+        for (let i = tradeData.length - 1; i >= 1; i--) {
+            const d = tradeData[i];
+            const gross = d.net + (d.fee || 0) + (d.tax || 0);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="ps-3 align-middle">${d.week}</td>
+                <td class="align-middle">${gross.toLocaleString()}</td>
+                <td class="align-middle text-muted">${(d.fee || 0).toLocaleString()}</td>
+                <td class="align-middle text-muted">${(d.tax || 0).toLocaleString()}</td>
+                <td class="text-center">
+                    <button class="btn btn-outline-info btn-sm py-0 px-2 me-1" onclick="editTrade(${i})">改</button>
+                    <button class="btn btn-outline-danger btn-sm py-0 px-2" onclick="deleteTrade(${i})">刪</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+    }
+
+    // C. 編輯功能：彈回左側輸入框並關閉視窗
+    function editTrade(index) {
+        const d = tradeData[index];
+        const gross = d.net + (d.fee || 0) + (d.tax || 0);
+        
+        // 填回左側欄位
+        document.getElementById('tradeWeek').value = d.week;
+        document.getElementById('tradeGross').value = gross;
+        document.getElementById('tradeFee').value = d.fee || 0;
+        document.getElementById('tradeTax').value = d.tax || 0;
+        
+        // 移除陣列中的該筆舊資料
+        tradeData.splice(index, 1);
+        
+        // 更新所有相關連的計算與圖表
+        recalculateTotals(); 
+        updateAll(); 
+        
+        // 關閉彈窗並滾動到頂部
+        closeHistoryModal();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // D. 刪除功能
+    function deleteTrade(index) {
+        if (confirm(`確定刪除 ${tradeData[index].week} 的資料嗎？`)) {
+            tradeData.splice(index, 1);
+            recalculateTotals();
+            updateAll();
+            renderHistoryTable(); // 重新整理表格顯示
+        }
+    }
+
+    // E. 核心輔助：重新校正帳戶總資產 (防止中間刪除導致數值斷裂)
+    function recalculateTotals() {
+        if (tradeData.length <= 1) return;
+        const initial = tradeData[0];
+        let records = tradeData.slice(1);
+
+        records.sort((a, b) => {
+            const getSortKey = (str) => {
+                // 如果是 "02"，補上 ZZZ 確保它排在該月所有 W1, W2 之後
+                if (str.length === 2) return str + "WZZZ"; 
+                return str;
+            };
+            return getSortKey(a.week).localeCompare(getSortKey(b.week));
+        });
+
+        tradeData = [initial, ...records];
+        for (let i = 1; i < tradeData.length; i++) {
+            tradeData[i].total = tradeData[i - 1].total + tradeData[i].net;
+        }
+    }
+    // 強制監聽標籤頁切換，切換回來時立刻校準
+    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function() {
+            const tc = document.getElementById('main-chart');
+            const lc = document.getElementById('life-chart');
+            
+            // 使用 requestAnimationFrame 會比 setTimeout 更順暢
+            // 它會確保在瀏覽器準備好畫下一幀時才執行尺寸調整
+            window.requestAnimationFrame(() => {
+                if (tc && tc.calcdata) Plotly.Plots.resize(tc);
+                if (lc && lc.calcdata) Plotly.Plots.resize(lc);
+            });
+        });
+    });
+</script>
+</body>
+</html>
