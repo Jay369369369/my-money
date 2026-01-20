@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
 
     <style>
         :root { 
@@ -76,6 +77,23 @@
             min-height: 580px;
             flex-grow: 1;               /* 確保在 flex 下自動撐開 */
             display: block !important;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+                font-size: 16px; /* 確保字體在手機上夠大 */
+            }
+            .container {
+                width: 100% !important; /* 強制填滿螢幕 */
+                box-sizing: border-box;
+            }
+            input, button {
+                width: 100%; /* 讓按鈕和輸入框變成長條狀，手指才好點 */
+                height: 44px; /* 蘋果建議的最小點擊高度 */
+                margin-bottom: 15px;
+                font-size: 18px;
+            }
         }
     </style>
 
