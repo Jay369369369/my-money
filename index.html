@@ -150,6 +150,7 @@
         async function loadDataFromCloud(uid) {
             const doc = await db.collection("users").doc(uid).get();
             if (doc.exists) {
+                //情況A:雲端有資料，直接載入
                 const data = doc.data();
                 tradeData = data.tradeData || [];
                 lifeData = data.lifeData || [];
@@ -157,9 +158,12 @@
                 
                 // 修改這裡：確保原本的函數存在才執行，避免報錯
                 if (typeof renderAllButtons === "function") renderAllButtons();
-                if (typeof updateAll === "function") updateAll(); 
+                if (typeof updateAll === "function") updateAll();
+                console.log("✅ 雲端資料載入成功，跳過初始設定"); 
             } else {
                 // 修改這裡：如果還沒寫初始化函數，先跳過
+                // 情況 B：雲端完全沒資料 (新使用者)
+                console.log("ℹ️ 偵測為新帳號，觸發初始金額設定");
                 if (typeof resetInitialAsset === "function") resetInitialAsset();
             }
         }
@@ -438,7 +442,7 @@
     isUpdating = false;
 
     window.onload = function() {
-        if (tradeData.length === 0) resetInitialAsset();
+        //if (tradeData.length === 0) resetInitialAsset();
         
         // 【新增這行】確保舊資料一讀取進來就自動按週次排序
         recalculateTotals(); 
