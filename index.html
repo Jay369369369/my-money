@@ -454,8 +454,35 @@
     };
 
     function resetInitialAsset() {
+        // 1. 彈出對話框讓使用者輸入
         let start = prompt("請設定初始資產:", "100000");
-        tradeData = [{ week: '初始', net: 0, total: parseFloat(start || 100000) }];
+        
+        // 如果使用者點擊取消，則不執行後續動作
+        if (start === null) return;
+
+        const amount = parseFloat(start) || 0;
+
+        // 2. 更新資料陣列
+        // 確保包含所有必要的欄位 (week, gross, fee, tax, net, total)
+        tradeData = [{ 
+            week: '初始', 
+            gross: 0, 
+            fee: 0, 
+            tax: 0, 
+            net: 0, 
+            total: amount 
+        }];
+
+        // 3. 執行計算與重新渲染 UI (這是原本漏掉的關鍵)
+        if (typeof recalculateTotals === "function") recalculateTotals();
+        if (typeof updateAll === "function") updateAll();
+
+        // 4. 同步到 Firebase 雲端
+        if (typeof saveDataToCloud === "function") {
+            saveDataToCloud();
+        }
+        
+        console.log("✅ 初始資產設定完成並已同步至雲端");
     }
 
     function updateAll() {
