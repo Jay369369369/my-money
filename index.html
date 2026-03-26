@@ -108,18 +108,21 @@
             const statusText = document.getElementById('user-status');
             const loginForm = document.getElementById('login-form');
             const logoutBtn = document.getElementById('logout-btn');
+            const changePassBtn = document.getElementById('change-pass-btn');
 
             if (user) {
                 currentUser = user;
                 statusText.innerHTML = `👤 已連線: <span style="color:var(--accent-gold)">${user.email}</span>`;
                 loginForm.style.display = 'none';
                 logoutBtn.style.display = 'block';
+                changePassBtn.style.display = 'block';
                 loadDataFromCloud(user.uid);
             } else {
                 currentUser = null;
                 statusText.innerHTML = "❌ 尚未登入";
                 loginForm.style.display = 'flex';
                 logoutBtn.style.display = 'none';
+                changePassBtn.style.display = 'block';
             }
         });
 
@@ -134,9 +137,40 @@
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-pass').value;
             try { await auth.signInWithEmailAndPassword(email, pass); } 
-            catch(e) { alert("登入失敗: " + e.message); }
+            catch(e) { alert("登入失敗: " + "密碼錯誤"); }
         }
         function handleLogout() { auth.signOut(); }
+
+        async function handleChangePassword() {
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                alert("請先登入帳號");
+                return;
+            }
+
+            const newPassword = prompt("請輸入您的新密碼 (至少 6 位字元):");
+            
+            // 使用者點擊取消或沒輸入
+            if (!newPassword) return;
+
+            if (newPassword.length < 6) {
+                alert("密碼長度太短，請至少設定 6 位數");
+                return;
+            }
+
+            try {
+                await user.updatePassword(newPassword);
+                alert("✅ 密碼修改成功！");
+            } catch (error) {
+                // 如果距離上次登入時間太久，Firebase 會要求重新驗證身分
+                if (error.code === 'auth/requires-recent-login') {
+                    alert("為了安全起見，請重新登入後再修改密碼。");
+                    handleLogout(); // 強制登出讓使用者重新登入
+                } else {
+                    alert("❌ 修改失敗: " + error.message);
+                }
+            }
+        }
 
         // 核心同步邏輯
         async function saveDataToCloud() {
@@ -181,7 +215,10 @@
             <button onclick="handleLogin()" class="btn btn-warning btn-sm fw-bold" style="background:#ffd700; color:#000;">登入</button>
             <button onclick="handleSignUp()" class="btn btn-outline-light btn-sm ms-1">註冊</button>
         </div>
-        <button id="logout-btn" onclick="handleLogout()" class="btn btn-outline-danger btn-sm" style="display: none;">登出</button>
+        <div class="d-flex">
+            <button id="change-pass-btn" onclick="handleChangePassword()" class="btn btn-outline-info btn-sm me-1" style="display: none;">修改密碼</button>
+            <button id="logout-btn" onclick="handleLogout()" class="btn btn-outline-danger btn-sm" style="display: none;">登出</button>
+        </div>
     </div>
 
     <header class="d-flex justify-content-between align-items-end mb-4">
