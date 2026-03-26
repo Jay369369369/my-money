@@ -990,8 +990,8 @@
 
         records.sort((a, b) => {
             const getSortKey = (str) => {
-                // 如果是 "02"，補上 ZZZ 確保它排在該月所有 W1, W2 之後
-                if (str.length === 2) return str + "WZZZ"; 
+                // 如果是 "02"，補上 W3 確保它排在該月所有 W1, W2 之後
+                if (str.length === 2) return str + "W3"; 
                 return str;
             };
             return getSortKey(a.week).localeCompare(getSortKey(b.week));
